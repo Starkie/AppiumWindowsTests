@@ -1,8 +1,10 @@
 ﻿namespace AppiumTests
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using OpenQA.Selenium;
     using OpenQA.Selenium.Appium;
     using OpenQA.Selenium.Appium.Windows;
 
@@ -16,45 +18,76 @@
         private const string appiumServer = @"http://127.0.0.1:4723/wd/hub";
 
         private const string testFolderRelativePath = @"../MyTestFolder/";
-        private const string testFileName = "MyTestFile.txt";
 
-        private WindowsDriver<WindowsElement> windowsDriver;
-
-        [TestInitialize]
-        public void SetUp()
+        [ClassInitialize]
+        public static void TestEnvironmentSetUp(TestContext context)
         {
-            DirectoryInfo testFolder = GetTestDirectory();
+            CreateTestFolder();
+        }
 
-            // Create the text file or overwrite it if it exists.
-            string testFileFullPath = $"{testFolder.FullName}/{testFileName}";
-            File.WriteAllText(testFileFullPath, "");
-
+        private static WindowsDriver<WindowsElement> InstanceWebDriver(IDictionary<string, string> additionalCapabilities = null)
+        {
             AppiumOptions appiumOptions = new AppiumOptions();
             appiumOptions.AddAdditionalCapability("app", @"C:\Windows\System32\notepad.exe");
             appiumOptions.AddAdditionalCapability("platformName", "Windows");
             appiumOptions.AddAdditionalCapability("deviceName", "WindowsPC");
-            appiumOptions.AddAdditionalCapability("appArguments", testFileFullPath);
 
-            this.windowsDriver = new WindowsDriver<WindowsElement>(new Uri(appiumServer), appiumOptions);
+            foreach (KeyValuePair<string, string> capatibility in additionalCapabilities)
+            {
+                appiumOptions.AddAdditionalCapability(capatibility.Key, capatibility.Value);
+            }
+
+            return new WindowsDriver<WindowsElement>(new Uri(appiumServer), appiumOptions);
         }
 
+        /// <summary>
+        /// Test opening an empty text file with notepad and inputing a given text.
+        /// </summary>
         [TestMethod]
         public void InputTextInNotepadWindow()
         {
             // Arrange.
             string expectedText = "Say hello world.";
 
-            // Act.
-            WindowsElement editTextBox = this.windowsDriver.FindElementByClassName("Edit");
-            editTextBox.SendKeys(expectedText);
+            // Create an empty text file.
+            DirectoryInfo currentTestFolder = CreateTestFolder(Path.GetRandomFileName());
+            string testFileFullPath = Path.Combine(currentTestFolder.FullName, "myTestFile.txt");
+            File.WriteAllText(testFileFullPath, "");
 
-            // Assert.
-            Assert.AreEqual(expectedText, editTextBox.Text, $"The expected text was '{expectedText}' but found '{editTextBox.Text}'.");
+            IDictionary<string, string> additionalCapabilities = new Dictionary<string, string>();
+            additionalCapabilities.Add("appWorkingDir", currentTestFolder.FullName);
+            additionalCapabilities.Add("appArguments", testFileFullPath);
+
+            using (WindowsDriver<WindowsElement> driver = InstanceWebDriver(additionalCapabilities))
+            {
+                // Act.
+                WindowsElement editTextBox = driver.FindElementByClassName("Edit");
+                editTextBox.SendKeys(expectedText);
+
+                editTextBox.Click();
+
+                // TODO: Fix SAVE Key combination.
+                driver.Keyboard.PressKey(Keys.Control + "G" + Keys.Control);
+
+                // Assert.
+                Assert.AreEqual(expectedText, editTextBox.Text, $"The expected text was '{expectedText}' but found '{editTextBox.Text}'.");
+            }
         }
 
-        private static DirectoryInfo GetTestDirectory()
+        [ClassCleanup]
+        public static void ClassCleanup()
         {
             DirectoryInfo testFolder = new DirectoryInfo(testFolderRelativePath);
+
+            if (testFolder?.Exists == true)
+            {
+                testFolder.Delete(recursive: true);
+            }
+        }
+
+        private static DirectoryInfo CreateTestFolder(string subfolderRelativePath = null)
+        {
+            DirectoryInfo testFolder = new DirectoryInfo(Path.Combine(testFolderRelativePath, subfolderRelativePath ?? ""));
 
             if (!testFolder.Exists)
             {
