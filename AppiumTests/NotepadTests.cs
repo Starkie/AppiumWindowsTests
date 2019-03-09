@@ -12,6 +12,9 @@
     [TestClass]
     public class NotepadTests
     {
+        // Change this path to point to your appium or winappdriver server.
+        private const string appiumServer = @"http://127.0.0.1:4723/wd/hub";
+
         private const string testFolderRelativePath = @"../MyTestFolder/";
         private const string testFileName = "MyTestFile.txt";
 
@@ -32,7 +35,7 @@
             appiumOptions.AddAdditionalCapability("deviceName", "WindowsPC");
             appiumOptions.AddAdditionalCapability("appArguments", testFileFullPath);
 
-            this.windowsDriver = new WindowsDriver<WindowsElement>(new Uri(@"http://127.0.0.1:4723/wd/hub"), appiumOptions);
+            this.windowsDriver = new WindowsDriver<WindowsElement>(new Uri(appiumServer), appiumOptions);
         }
 
         [TestMethod]
